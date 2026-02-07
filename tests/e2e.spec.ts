@@ -29,7 +29,7 @@ test.describe('End to end', () => {
         expect.soft(await locators.addToCart.count()).toEqual(addToCartCount)
 
         for (let i = 0; i < clickCount.length; i++) {
-            console.log(`click count : ${clickCount[i]}`)
+            // console.log(`click count : ${clickCount[i]}`)
             await locators.addToCart.nth(i).click({ delay: 50, clickCount: clickCount[i] })
             upcArr.push(await locators.shopUpc.nth(i).textContent())
             priceArr.push((await locators.priceContainer.nth(i).textContent())?.slice(1))
@@ -44,15 +44,72 @@ test.describe('End to end', () => {
         for (let i = 0; i < upcArr.length; i++) {
             await expect.soft(locators.quantity.nth(i)).toHaveText(`${clickCount[i]}`)
             await expect.soft(locators.cartUpc.nth(i)).toHaveText(`${upcArr[i]}`)
-            
-            let subTotal = (clickCount[i] * Number( priceArr[i])).toFixed(2)
-            console.log (`subtotal ${subTotal}`)
+
+            let subTotal = (clickCount[i] * Number(priceArr[i])).toFixed(2)
+            // console.log (`subtotal ${subTotal}`)
             await expect.soft(locators.unitPrice.nth(i)).toContainText(`${priceArr[i]}`)
 
             await expect.soft(locators.subToTal.nth(i)).toContainText(`${subTotal}`)
         }
+        // await page.waitForTimeout(3000)
+    });
+
+    test('TS002: Add products from each category and assert the cart counter and cart page', async ({ page }) => {
+        let clickCount = [1]
+        let categoryCount = 5
+        let cartTotal = clickCount.reduce((acc, curr) => curr + acc)
+        const addToCartCount = 4
+        const upcArr = []
+        const priceArr = []
+
+
+        for (let i = 0; i < categoryCount; i++) {
+            console.log(i)
+            await locators.categoryImage.nth(i).click()
+            await locators.brandLogo.nth(0).click()
+            await page.waitForSelector('.add-to-cart')
+            await locators.addToCart.nth(0).click({ delay: 50 })
+            await locators.headerLogo.click()
+
+        }
+
+       await expect.soft(locators.cartCounterId).toHaveText(categoryCount.toString())
+        
+        
+        // await locators.categoryImage.nth(0).click()
+        // await locators.brandLogo.nth(0).click()
+
+        // await page.waitForSelector('.add-to-cart')
+
+        // expect.soft(await locators.addToCart.count()).toEqual(addToCartCount)
+
+        // for (let i = 0; i < clickCount.length; i++) {
+        //     // console.log(`click count : ${clickCount[i]}`)
+        //     await locators.addToCart.nth(i).click({ delay: 50, clickCount: clickCount[i] })
+        //     upcArr.push(await locators.shopUpc.nth(i).textContent())
+        //     priceArr.push((await locators.priceContainer.nth(i).textContent())?.slice(1))
+        // }
+
+        // await expect.soft(locators.cartCounterId).toHaveText(cartTotal.toString())
+        // await locators.shoppingBag.click()
+
+        // await page.waitForSelector('.order-details-container')
+        // expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 1)
+
+        // for (let i = 0; i < upcArr.length; i++) {
+        //     await expect.soft(locators.quantity.nth(i)).toHaveText(`${clickCount[i]}`)
+        //     await expect.soft(locators.cartUpc.nth(i)).toHaveText(`${upcArr[i]}`)
+
+        //     let subTotal = (clickCount[i] * Number( priceArr[i])).toFixed(2)
+        //     // console.log (`subtotal ${subTotal}`)
+        //     await expect.soft(locators.unitPrice.nth(i)).toContainText(`${priceArr[i]}`)
+
+        //     await expect.soft(locators.subToTal.nth(i)).toContainText(`${subTotal}`)
+        // }
         await page.waitForTimeout(3000)
     });
+
+
 
 })
 
