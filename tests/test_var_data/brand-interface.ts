@@ -96,3 +96,8 @@ export const fashionBrands: IBrand[] = [
 ]
 
 
+
+// Export helper functions if needed
+export function getBrandById(id: string): IBrand | undefined {
+  return fashionBrands.find(brand => brand.id === id)
+}

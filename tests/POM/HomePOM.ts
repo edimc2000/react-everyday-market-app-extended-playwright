@@ -1,6 +1,6 @@
 import { Page, Locator } from '@playwright/test';
 
-export class HomePOM {
+export class SpaPOM {
     readonly page: Page
     readonly headerLogo: Locator
     readonly categoryTitle: Locator
