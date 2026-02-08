@@ -17,6 +17,8 @@ export class SpaPOM {
     readonly priceContainer: Locator
     readonly unitPrice: Locator
     readonly subToTal: Locator
+    readonly deleteButton: Locator
+
 
     // Add your locators here
     // Example: readonly headerTitle: Locator;
@@ -45,6 +47,7 @@ export class SpaPOM {
         this.unitPrice = this.page.locator('.price-container.cart-price.unit-price')
         this.subToTal = this.page.locator('.price-container.cart-price.subtotal')
 
+        this.deleteButton = this.page.locator('.svg-delete')
 
 
 

@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 import { Variables } from './test_var_data/vars_test_data.ts';
-import { CATEGORIES } from './test_var_data/category.ts';
 import { SpaPOM } from './POM/HomePOM.ts';
-import { count } from 'node:console';
+import { CATEGORIES } from './test_var_data/category.ts';
+
 
 test.describe('End to end', () => {
     const env = new Variables
@@ -104,7 +104,7 @@ test.describe('End to end', () => {
         const context = await browser.newContext({
             storageState: undefined // Start with clean state
         })
-        
+
         const page1 = await context.newPage()
         const page2 = await context.newPage()
 
@@ -112,117 +112,242 @@ test.describe('End to end', () => {
         let locators = new SpaPOM(page1)
 
         try {
-            // === WINDOW 1: Add products to cart ===
-            console.log('Window 1: Adding products to cart')
-            await page1.goto(env.baseURL)
-            
-            await locators.categoryImage.nth(0).click()
-            await locators.brandLogo.nth(0).click()
-            await page1.waitForSelector('.add-to-cart')
+            await test.step('WINDOW 1: Add products to cart', async () => {
+                console.log('Window 1: Adding products to cart')
+                await page1.goto(env.baseURL)
 
-            // Add products to cart - let the application handle localStorage naturally
-            for (let i = 0; i < clickCount.length; i++) {
-                await locators.addToCart.nth(i).click({ delay: 50, clickCount: clickCount[i] })
-                upcArr.push(await locators.shopUpc.nth(i).textContent())
-                priceArr.push((await locators.priceContainer.nth(i).textContent())?.slice(1))
-            }
+                await locators.categoryImage.nth(0).click()
+                await locators.brandLogo.nth(0).click()
+                await page1.waitForSelector('.add-to-cart')
 
-            // Assert cart counter in window 1
-            await expect.soft(locators.cartCounterId).toHaveText(cartTotal.toString())
-            console.log(`Window 1: Cart counter shows ${cartTotal} items`)
+                // Add products to cart - let the application handle localStorage naturally
+                for (let i = 0; i < clickCount.length; i++) {
+                    await locators.addToCart.nth(i).click({ delay: 50, clickCount: clickCount[i] })
+                    upcArr.push(await locators.shopUpc.nth(i).textContent())
+                    priceArr.push((await locators.priceContainer.nth(i).textContent())?.slice(1))
+                }
 
-            // Verify cart page in window 1
-            await locators.shoppingBag.click()
-            await page1.waitForSelector('.order-details-container')
-            expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 1)
+                // Assert cart counter in window 1
+                await expect.soft(locators.cartCounterId).toHaveText(cartTotal.toString())
+                console.log(`Window 1: Cart counter shows ${cartTotal} items`)
+            });
 
-            for (let i = 0; i < addToCartCount; i++) {
-                await expect.soft(locators.quantity.nth(i)).toHaveText(`${clickCount[i]}`)
-                await expect.soft(locators.cartUpc.nth(i)).toHaveText(`${upcArr[i]}`)
-                let subTotal = (clickCount[i] * Number(priceArr[i])).toFixed(2)
-                await expect.soft(locators.unitPrice.nth(i)).toContainText(`${priceArr[i]}`)
-                await expect.soft(locators.subToTal.nth(i)).toContainText(`${subTotal}`)
-            }
-            console.log('Window 1: Cart page verification completed')
+            await test.step('WINDOW 1: Verify cart page contents', async () => {
+                // Verify cart page in window 1
+                await locators.shoppingBag.click()
+                await page1.waitForSelector('.order-details-container')
+                expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 1)
 
-            // === WINDOW 2: Verify cart persists using same localStorage ===
-            console.log('Window 2: Verifying cart persistence through application localStorage')
-            
-            // Update POM to work with page2
-            locators = new SpaPOM(page2)
-            await page2.goto(env.baseURL)
-            
-            // Check if cart counter persists in window 2
-            await page2.waitForLoadState('domcontentloaded')
-            
-            // Wait a moment for any cart data to load from localStorage
-            await page2.waitForTimeout(1000)
-            
-            // Verify cart counter shows the same total in window 2
-            await expect.soft(locators.cartCounterId).toHaveText(cartTotal.toString())
-            console.log(`Window 2: Cart counter shows ${cartTotal} items (persisted from window 1)`)
+                for (let i = 0; i < addToCartCount; i++) {
+                    await expect.soft(locators.quantity.nth(i)).toHaveText(`${clickCount[i]}`)
+                    await expect.soft(locators.cartUpc.nth(i)).toHaveText(`${upcArr[i]}`)
+                    let subTotal = (clickCount[i] * Number(priceArr[i])).toFixed(2)
+                    await expect.soft(locators.unitPrice.nth(i)).toContainText(`${priceArr[i]}`)
+                    await expect.soft(locators.subToTal.nth(i)).toContainText(`${subTotal}`)
+                }
+                console.log('Window 1: Cart page verification completed')
 
-            // Navigate to cart page in window 2 and verify all items are there
-            await locators.shoppingBag.click()
-            await page2.waitForSelector('.order-details-container')
-            
-            // Verify same number of items in cart
-            expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 1)
+                // Save storage state to file after adding items
+                await context.storageState({ path: 'tests/storage/cart-state.json' })
+                console.log('Storage state saved to cart-state.json')
+            });
 
-            // Verify each cart item persisted correctly
-            for (let i = 0; i < addToCartCount; i++) {
-                await expect.soft(locators.quantity.nth(i)).toHaveText(`${clickCount[i]}`)
-                await expect.soft(locators.cartUpc.nth(i)).toHaveText(`${upcArr[i]}`)
-                
-                let subTotal = (clickCount[i] * Number(priceArr[i])).toFixed(2)
-                await expect.soft(locators.unitPrice.nth(i)).toContainText(`${priceArr[i]}`)
-                await expect.soft(locators.subToTal.nth(i)).toContainText(`${subTotal}`)
-                
-                console.log(`Window 2: Item ${i+1} verified - UPC: ${upcArr[i]}, Qty: ${clickCount[i]}, Price: $${priceArr[i]}`)
-            }
+            await test.step('WINDOW 2: Verify cart persistence via localStorage', async () => {
+                console.log('Window 2: Verifying cart persistence through application localStorage')
 
-            // === Test that both windows share the same cart localStorage ===
-            // Add one more item in window 2
-            await locators.headerLogo.click() // Go back to home
-            await locators.categoryImage.nth(1).click() // Different category 
-            await locators.brandLogo.nth(0).click()
-            await page2.waitForSelector('.add-to-cart')
-            
-            // Add 1 item from window 2
-            await locators.addToCart.nth(0).click({ delay: 50, clickCount: 1 })
-            const newUpc = await locators.shopUpc.nth(0).textContent()
-            const newPrice = (await locators.priceContainer.nth(0).textContent())?.slice(1)
-            
-            // Verify cart counter updated
-            const newTotal = cartTotal + 1
-            await expect.soft(locators.cartCounterId).toHaveText(newTotal.toString())
-            console.log(`Window 2: Added 1 item, cart now shows ${newTotal}`)
+                // Update POM to work with page2
+                locators = new SpaPOM(page2)
+                await page2.goto(env.baseURL)
 
-            // === Verify the change is reflected in window 1 (same localStorage) ===
-            // Switch POM back to work with page1
-            locators = new SpaPOM(page1)
-            await page1.goto(env.baseURL) // Refresh window 1 to load updated cart
-            await page1.waitForLoadState('domcontentloaded')
-            await page1.waitForTimeout(1000) // Allow cart to load from localStorage
-            
-            // Window 1 should now show the updated cart count
-            await expect.soft(locators.cartCounterId).toHaveText(newTotal.toString())
-            console.log(`Window 1: Cart counter updated to ${newTotal} (reflecting window 2 changes)`)
+                // Check if cart counter persists in window 2
+                await page2.waitForLoadState('domcontentloaded')
 
-            // Verify cart page in window 1 now contains the new item
-            await locators.shoppingBag.click()
-            await page1.waitForSelector('.order-details-container')
-            
-            // Should now have one more item (4 total)
-            expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 2)
-            console.log('Window 1: Verified cart now contains item added from window 2')
+                // Wait a moment for any cart data to load from localStorage
+                await page2.waitForTimeout(1000)
+
+                // Verify cart counter shows the same total in window 2
+                await expect.soft(locators.cartCounterId).toHaveText(cartTotal.toString())
+                console.log(`Window 2: Cart counter shows ${cartTotal} items (persisted from window 1)`)
+            });
+
+            await test.step('WINDOW 2: Verify all cart items persisted correctly', async () => {
+                // Navigate to cart page in window 2 and verify all items are there
+                await locators.shoppingBag.click()
+                await page2.waitForSelector('.order-details-container')
+
+                // Verify same number of items in cart
+                expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 1)
+
+                // Verify each cart item persisted correctly
+                for (let i = 0; i < addToCartCount; i++) {
+                    await expect.soft(locators.quantity.nth(i)).toHaveText(`${clickCount[i]}`)
+                    await expect.soft(locators.cartUpc.nth(i)).toHaveText(`${upcArr[i]}`)
+
+                    let subTotal = (clickCount[i] * Number(priceArr[i])).toFixed(2)
+                    await expect.soft(locators.unitPrice.nth(i)).toContainText(`${priceArr[i]}`)
+                    await expect.soft(locators.subToTal.nth(i)).toContainText(`${subTotal}`)
+
+                    console.log(`Window 2: Item ${i + 1} verified - UPC: ${upcArr[i]}, Qty: ${clickCount[i]}, Price: $${priceArr[i]}`)
+                }
+            });
+
+            await test.step('WINDOW 2: Add item from different category', async () => {
+                // Add one more item in window 2
+                await locators.headerLogo.click() // Go back to home
+                await locators.categoryImage.nth(1).click() // Different category 
+                await locators.brandLogo.nth(0).click()
+                await page2.waitForSelector('.add-to-cart')
+
+                // Add 1 item from window 2
+                await locators.addToCart.nth(0).click({ delay: 50, clickCount: 1 })
+                const newUpc = await locators.shopUpc.nth(0).textContent()
+                const newPrice = (await locators.priceContainer.nth(0).textContent())?.slice(1)
+
+                // Verify cart counter updated
+                const newTotal = cartTotal + 1
+                await expect.soft(locators.cartCounterId).toHaveText(newTotal.toString())
+                console.log(`Window 2: Added 1 item, cart now shows ${newTotal}`)
+            });
+
+            await test.step('WINDOW 1: Verify localStorage sync from Page 2', async () => {
+                // Switch POM back to work with page1
+                locators = new SpaPOM(page1)
+                await page1.goto(env.baseURL) // Refresh window 1 to load updated cart
+                await page1.waitForLoadState('domcontentloaded')
+                await page1.waitForTimeout(1000) // Allow cart to load from localStorage
+
+                // Window 1 should now show the updated cart count
+                const newTotal = cartTotal + 1
+                await expect.soft(locators.cartCounterId).toHaveText(newTotal.toString())
+                console.log(`Window 1: Cart counter updated to ${newTotal} (reflecting window 2 changes)`)
+
+                // Verify cart page in window 1 now contains the new item
+                await locators.shoppingBag.click()
+                await page1.waitForSelector('.order-details-container')
+
+                // Should now have one more item (4 total)
+                expect.soft(await locators.containerOrderDetails.count()).toEqual(addToCartCount + 2)
+                console.log('Window 1: Verified cart now contains item added from window 2')
+            });
 
             console.log('TS003: Multi-window localStorage test completed successfully - Both windows share same cart storage')
-            
+
         } finally {
             // Clean up context
             await context.close()
         }
+    });
+
+
+    test('TS004: Delete an items on the cart', async ({ page }) => {
+        // Load storage state data from file
+        const fs = require('fs');
+        const storageState = JSON.parse(fs.readFileSync('./tests/storage/TS004_cart_state.json', 'utf8'));
+
+        // Set localStorage data directly on the page
+        await page.addInitScript((storageData) => {
+            const localStorage = storageData.origins[0].localStorage;
+            localStorage.forEach(item => {
+                window.localStorage.setItem(item.name, item.value);
+            });
+        }, storageState);
+
+
+        await page.goto(env.baseURL);
+        await page.waitForLoadState('domcontentloaded');
+
+        // Access cart_items from localStorage
+        const cart_items = await page.evaluate(() => {
+            const items = localStorage.getItem('cartItems');
+            const counter = localStorage.getItem('cartCounter');
+            return {
+                items: items ? JSON.parse(items) : [],
+                counter: counter || '0'
+            };
+        });
+
+        console.log(`TS004: Found ${cart_items.items.length} items in localStorage`);
+        console.log(`TS004: Cart counter should show ${cart_items.counter} items`);
+
+        // Verify cart counter matches saved state
+        await expect.soft(locators.cartCounterId).toHaveText(cart_items.counter);
+
+
+        // Load the cart 
+        await locators.shoppingBag.click()
+        await page.waitForSelector('.cart-upc')
+
+        let firstItemQtty = await locators.quantity.nth(0).textContent()
+        console.log(`1 - qtty >>  ${firstItemQtty}`)
+
+        await locators.deleteButton.nth(0).click()
+        let newQuantityOnCart = Number(cart_items.counter) - Number(firstItemQtty)
+
+        console.log(`1 - newqtty >>  ${newQuantityOnCart}`)
+        await expect.soft(locators.cartCounterId).toHaveText(`${newQuantityOnCart}`);
+
+        await page.waitForTimeout(10000)
+    });
+
+
+
+
+
+    test('TS005: Delete all items on the cart', async ({ page }) => {
+        // Load storage state data from file
+        const fs = require('fs');
+        const storageState = JSON.parse(fs.readFileSync('./tests/storage/TS004_cart_state.json', 'utf8'));
+
+        // Set localStorage data directly on the page
+        await page.addInitScript((storageData) => {
+            const localStorage = storageData.origins[0].localStorage;
+            localStorage.forEach(item => {
+                window.localStorage.setItem(item.name, item.value);
+            });
+        }, storageState);
+
+
+        await page.goto(env.baseURL);
+        await page.waitForLoadState('domcontentloaded');
+
+        // Access cart_items from localStorage
+        const cart_items = await page.evaluate(() => {
+            const items = localStorage.getItem('cartItems');
+            const counter = localStorage.getItem('cartCounter');
+            return {
+                items: items ? JSON.parse(items) : [],
+                counter: counter || '0'
+            };
+        });
+
+        console.log(`TS004: Found ${cart_items.items.length} items in localStorage`);
+        console.log(`TS004: Cart counter should show ${cart_items.counter} items`);
+
+        // Verify cart counter matches saved state
+        await expect.soft(locators.cartCounterId).toHaveText(cart_items.counter);
+
+        // Load the cart 
+        await locators.shoppingBag.click()
+        await page.waitForSelector('.cart-upc')
+
+        for (let index = 0; index < cart_items.items.length; index++) {
+            await locators.deleteButton.nth(0).click()
+        }
+
+        await expect.soft(locators.cartCounterId).not.toBeAttached()
+
+
+       await page.waitForSelector('.category-image')
+        //   const menBrands = fashionBrands.filter(brand => brand.type.includes('men'));
+
+        CATEGORIES.forEach( async (category, i) => {
+
+           await expect (locators.categoryTitle.nth(i)).toBeVisible()
+     console.log(`TS004: 1 loaded image ${i}`);
+
+        })
+
+        // await page.waitForTimeout(10000)
     });
 
 });
